@@ -2,10 +2,13 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Money from '@/Components/Orders/Money';
 import OrderStatusBadge from '@/Components/Orders/OrderStatusBadge';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import StarRating from '@/Components/Orders/StarRating';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 export default function OrdersShow({ order, viewer_role, can }) {
     const { errors } = usePage().props;
+    const review = useForm({ rating: 0, comment: '' });
+    const act = (name) => router.post(route(`orders.${name}`, order.id), {}, { preserveScroll: true });
 
     const cancel = () => {
         const reason = window.prompt('Why are you cancelling this order? (optional)') ?? null;
@@ -58,6 +61,18 @@ export default function OrdersShow({ order, viewer_role, can }) {
                                 Pay with MTN MoMo
                             </Link>
                         )}
+                        {can.ship && (
+                            <button onClick={() => act('ship')} className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white">Mark as shipped</button>
+                        )}
+                        {can.deliver && (
+                            <button onClick={() => act('deliver')} className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white">Mark as delivered</button>
+                        )}
+                        {can.confirm_delivery && (
+                            <button onClick={() => act('confirm-delivery')} className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white">I received this order</button>
+                        )}
+                        {can.complain && (
+                            <Link href={route('complaints.create', { order: order.id })} className="rounded-md border border-gray-300 px-4 py-2 text-sm">Report a problem</Link>
+                        )}
                         {can.cancel && (
                             <button onClick={cancel} className="rounded-md border border-red-300 px-4 py-2 text-sm text-red-700">Cancel order</button>
                         )}
@@ -67,6 +82,18 @@ export default function OrdersShow({ order, viewer_role, can }) {
                             </Link>
                         )}
                     </section>
+                    {can.review && (
+                        <form onSubmit={(e) => { e.preventDefault(); review.post(route('orders.reviews.store', order.id), { preserveScroll: true }); }}
+                            className="space-y-3 rounded-lg bg-white p-5 shadow-sm">
+                            <h3 className="font-semibold text-gray-900">Rate {viewer_role === 'buyer' ? order.seller.name : order.buyer.name}</h3>
+                            <StarRating value={review.data.rating} onChange={(n) => review.setData('rating', n)} />
+                            {review.errors.rating && <p className="text-xs text-red-600">{review.errors.rating}</p>}
+                            <textarea rows={3} maxLength={1000} value={review.data.comment} onChange={(e) => review.setData('comment', e.target.value)}
+                                placeholder="Tell others about your experience (optional)" className="w-full rounded-md border-gray-300 shadow-sm" />
+                            <button type="submit" disabled={review.processing || review.data.rating === 0}
+                                className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Submit review</button>
+                        </form>
+                    )}
                 </div>
 
                 <aside className="rounded-lg bg-white p-5 shadow-sm">

@@ -123,6 +123,11 @@ class OrderController extends Controller
             'can' => [
                 'pay' => $user->id === $order->buyer_id && $order->status === OrderStatus::AwaitingPayment,
                 'cancel' => $order->isParticipant($user) && $order->status === OrderStatus::AwaitingPayment,
+                'ship' => $user->id === $order->seller_id && $order->status === OrderStatus::Paid,
+                'deliver' => $user->id === $order->seller_id && $order->status === OrderStatus::Shipped,
+                'confirm_delivery' => $user->id === $order->buyer_id && in_array($order->status, [OrderStatus::Shipped, OrderStatus::Delivered], true),
+                'review' => $user->can('review', $order),
+                'complain' => $order->isParticipant($user),
             ],
         ]);
     }
