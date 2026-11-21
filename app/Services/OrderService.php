@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\InventoryReservations;
 use App\Enums\OrderStatus;
+use App\Events\OrderStatusChanged;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Conversation;
 use App\Models\Listing;
@@ -119,6 +120,7 @@ class OrderService
         ]);
 
         $this->inventory->reserve($order->load('items'));
+        OrderStatusChanged::dispatch($order, null, OrderStatus::AwaitingPayment, $buyer);
 
         return $order;
     }
@@ -164,6 +166,8 @@ class OrderService
             if ($to === OrderStatus::Cancelled && $from === OrderStatus::AwaitingPayment) {
                 $this->inventory->release($locked->load('items'));
             }
+
+            OrderStatusChanged::dispatch($locked, $from, $to, $by);
 
             $order->setRawAttributes($locked->getAttributes(), true);
 

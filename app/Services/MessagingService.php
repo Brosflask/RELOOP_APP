@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ConversationStatus;
 use App\Enums\OfferStatus;
+use App\Events\OfferMade;
 use App\Exceptions\BusinessRuleException;
 use App\Models\Conversation;
 use App\Models\Listing;
@@ -123,6 +124,7 @@ class MessagingService
                 'expires_at' => now()->addHours(self::OFFER_LIFETIME_HOURS),
             ]);
             $conversation->update(['last_message_at' => $offer->created_at]);
+            OfferMade::dispatch($offer);
 
             return $offer;
         });
