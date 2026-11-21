@@ -54,12 +54,9 @@ export default function OrdersShow({ order, viewer_role, can }) {
 
                     <section className="flex flex-wrap gap-3">
                         {can.pay && (
-                            // The payment page arrives with the payments module.
-                            route().has('payments.create') && (
-                                <Link href={route('payments.create', order.id)} className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white">
-                                    Pay with MTN MoMo
-                                </Link>
-                            )
+                            <Link href={route('payments.create', order.id)} className="rounded-md bg-yellow-400 px-4 py-2 text-sm font-semibold text-gray-900">
+                                Pay with MTN MoMo
+                            </Link>
                         )}
                         {can.cancel && (
                             <button onClick={cancel} className="rounded-md border border-red-300 px-4 py-2 text-sm text-red-700">Cancel order</button>

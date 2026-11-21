@@ -68,7 +68,7 @@ class MtnMomoService
             'X-Target-Environment' => $this->config['environment'],
         ];
 
-        if ($callbackUrl = $this->callbackUrl()) {
+        if ($callbackUrl = $this->callbackUrl($payment)) {
             $headers['X-Callback-Url'] = $callbackUrl;
         }
 
@@ -129,7 +129,8 @@ class MtnMomoService
         return MomoStatus::fromResponse($response->status(), is_array($body) ? $body : []);
     }
 
-    public function callbackUrl(): ?string
+    /** Per-payment callback URL: secret token plus our own reference, so the callback body is never needed to find the payment. */
+    public function callbackUrl(Payment $payment): ?string
     {
         $host = $this->config['callback_host'] ?? null;
         $token = $this->config['callback_token'] ?? null;
@@ -138,7 +139,12 @@ class MtnMomoService
             return null;
         }
 
-        return rtrim($host, '/').'/api/payments/momo/callback/'.$token;
+        return rtrim($host, '/').'/api/payments/momo/callback/'.$token.'/'.$payment->transaction_reference;
+    }
+
+    public function providerCurrency(): string
+    {
+        return $this->config['currency'];
     }
 
     public function isSandbox(): bool

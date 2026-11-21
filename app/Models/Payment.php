@@ -24,6 +24,7 @@ class Payment extends Model
 
     protected $attributes = [
         'status' => 'pending',
+        'requires_attention' => false,
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'last_checked_at' => 'datetime',
             'verified_at' => 'datetime',
+            'requires_attention' => 'boolean',
         ];
     }
 

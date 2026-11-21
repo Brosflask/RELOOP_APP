@@ -177,6 +177,7 @@ The terms both parties agreed to. One per order.
 | last_checked_at | timestamp, nullable | **[added]** for reconciliation |
 | check_attempts | unsigned smallint, default 0 | **[added]** |
 | verified_at | timestamp, nullable | **[added]** when a final status was confirmed by a status query |
+| requires_attention, attention_reason | boolean, string(255) | **[added]** admin must review: amount mismatch, second successful payment for a paid order, pending > 24h |
 
 Indexes: unique `transaction_reference`, unique `successful_order_id`, index (`order_id`, `status`), index (`status`, `created_at`) for reconciliation and admin monitoring.
 
@@ -309,7 +310,7 @@ Raising a complaint on a `paid`/`shipped`/`delivered` order also moves it to `di
 - `routes/orders.php`: buyer dashboard, orders, conversations, messages, offers, reviews, complaints. Middleware `auth`, `verified` **[if Dev 1 uses email verification]**.
 - `routes/payments.php`: payment initiation, payment status page, polling endpoint.
 - `routes/admin.php`: shared with Dev 1. Dev 4 adds only a clearly separated `// Developer 4: reports, transactions, complaints, disputes` group. Coordinate edits to avoid conflicts.
-- `routes/api.php`: only `POST /api/payments/momo/callback/{token}` (and `PUT`, since MTN may use either), no session, throttled.
+- `routes/api.php`: only `POST|PUT /api/payments/momo/callback/{token}/{transaction_reference}`, no session, throttled. The reference is in the URL we hand MTN per payment, so the unsigned callback body is never needed to find the payment.
 
 ### 5.8 React pages (Inertia)
 - `Pages/Buyer/Dashboard.jsx`: active orders, awaiting payment, recent conversations, quick links to the marketplace.

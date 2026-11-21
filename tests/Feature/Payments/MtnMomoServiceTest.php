@@ -95,7 +95,7 @@ class MtnMomoServiceTest extends TestCase
                 && $r->hasHeader('Authorization', 'Bearer tok-123')
                 && $r->hasHeader('X-Reference-Id', '7f8d2c1e-1111-4a2b-9c3d-123456789abc')
                 && $r->hasHeader('X-Target-Environment', 'sandbox')
-                && $r->hasHeader('X-Callback-Url', 'https://reloop.test/api/payments/momo/callback/secret-token')
+                && $r->hasHeader('X-Callback-Url', 'https://reloop.test/api/payments/momo/callback/secret-token/7f8d2c1e-1111-4a2b-9c3d-123456789abc')
                 && $r['amount'] === '80'
                 && $r['currency'] === 'EUR'
                 && $r['externalId'] === 'ORD-2026-000001'
