@@ -44,7 +44,6 @@ One negotiation thread between a buyer and a seller about a listing.
 | listing_id | FK `listings.id`, nullable, `nullOnDelete` | null for general enquiries **[GUESS]** |
 | buyer_id | FK `users.id` | |
 | seller_id | FK `users.id` | copied from `listings.seller_id` |
-| order_id | FK `orders.id`, nullable | set once an order is created from this conversation |
 | status | string | `open`, `closed` |
 | last_message_at | timestamp, nullable | for inbox sorting |
 
@@ -255,7 +254,7 @@ Raising a complaint on a `paid`/`shipped`/`delivered` order also moves it to `di
 ## 5. Backend structure (Dev 4 files)
 
 ### 5.1 Models and relationships
-- `Conversation`: belongsTo `listing`, `buyer` (User), `seller` (User), `order`; hasMany `messages`, `offers`; hasOne `latestOffer`.
+- `Conversation`: belongsTo `listing`, `buyer` (User), `seller` (User); hasMany `messages`, `offers`, `orders` (via `orders.conversation_id`, which avoids a circular foreign key); hasOne `latestOffer`.
 - `Message`: belongsTo `conversation`, `sender`.
 - `Offer`: belongsTo `conversation`, `listing`, `maker` (User, `made_by`), `parent` (Offer); hasMany `counters`.
 - `Order`: belongsTo `buyer`, `seller`, `conversation`; hasMany `items`, `payments`, `statusHistories`, `reviews`, `complaints`; hasOne `agreement`, `successfulPayment`.
@@ -329,7 +328,7 @@ Raising a complaint on a `paid`/`shipped`/`delivered` order also moves it to `di
 1. Buyer opens a listing (Dev 3 page) and clicks "Message seller" or "Make an offer" → `ConversationController@store` finds or creates the conversation.
 2. Either party sends messages; buyer or seller makes an offer (price, quantity). Validation checks quantity ≤ available and listing is `active`.
 3. The other party accepts, rejects or counters.
-4. On accept (`MessagingService::acceptOffer`, one DB transaction): lock the offer and listing detail row, re-check availability, mark offer `accepted`, create `order` + `order_item` + `order_agreement`, reserve inventory via Dev 3's service, record status history, link the conversation to the order.
+4. On accept (`MessagingService::acceptOffer`, one DB transaction): lock the offer and listing detail row, re-check availability, mark offer `accepted`, create `order` (with `conversation_id`) + `order_item` + `order_agreement`, reserve inventory via Dev 3's service, record status history.
 5. "Buy now at listed price" follows the same order-creation path without an offer.
 
 ### 6.2 Pay (MTN MoMo, Collection API)
@@ -349,7 +348,7 @@ Seller marks `shipped` → buyer confirms delivery (`delivered`) → order becom
 
 ## 7. MTN MoMo integration details
 
-### 7.1 Configuration (`config/services.php` → `mtn_momo`, values from `.env`, never committed)
+### 7.1 Configuration (`config/mtn_momo.php`, a Dev 4 file so the shared `config/services.php` is untouched; values from `.env`, never committed)
 ```
 MTN_MOMO_BASE_URL=https://sandbox.momodeveloper.mtn.com
 MTN_MOMO_ENVIRONMENT=sandbox          # production: mtnghana
@@ -439,7 +438,7 @@ Because Laravel is not initialized yet, D2–D3 work can be built and tested aga
 ## 11. Git workflow for Developer 4
 - Work on `feature/payments` (one branch for all Dev 4 work, per the agreed branch list). Pull `dev` often once it exists.
 - Commit only Dev 4 files: the files listed in Section 5 plus Dev 4 migrations, factories, tests and `docs/developer-4-plan.md`.
-- Shared files (`routes/web.php` includes, `routes/admin.php`, `app/Providers/*`, `config/services.php`, `.env.example`, `bootstrap/app.php`) are touched only with small, clearly marked additions, and called out in the PR description.
+- Shared files (`routes/web.php` includes, `routes/admin.php`, `app/Providers/*`, `.env.example`, `bootstrap/app.php`, `routes/console.php` for the scheduler) are touched only with small, clearly marked additions, and called out in the PR description.
 - PRs into `dev`, reviewed by at least one other developer. Migrations announced in the team chat before merge.
 
 ---
