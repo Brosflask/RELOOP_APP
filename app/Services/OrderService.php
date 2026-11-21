@@ -175,4 +175,33 @@ class OrderService
     {
         return $this->transition($order, OrderStatus::Cancelled, $by, $reason, ['cancellation_reason' => $reason]);
     }
+
+    public function ship(Order $order, User $seller, ?string $note = null): Order
+    {
+        return $this->transition($order, OrderStatus::Shipped, $seller, $note);
+    }
+
+    /** Seller records the hand-over. The buyer can still confirm or raise a complaint. */
+    public function markDelivered(Order $order, User $seller, ?string $note = null): Order
+    {
+        return $this->transition($order, OrderStatus::Delivered, $seller, $note);
+    }
+
+    /** Buyer confirms receipt: the order is delivered (if not already) and completed. */
+    public function confirmDelivery(Order $order, User $buyer): Order
+    {
+        return DB::transaction(function () use ($order, $buyer) {
+            if ($order->fresh()->status === OrderStatus::Shipped) {
+                $this->transition($order, OrderStatus::Delivered, $buyer, 'Buyer confirmed receipt');
+            }
+
+            return $this->transition($order, OrderStatus::Completed, $buyer, 'Buyer confirmed receipt');
+        });
+    }
+
+    /** Raising a complaint on a paid, shipped or delivered order freezes it as disputed. */
+    public function dispute(Order $order, User $by, string $note): Order
+    {
+        return $this->transition($order, OrderStatus::Disputed, $by, $note);
+    }
 }

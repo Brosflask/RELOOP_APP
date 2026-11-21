@@ -8,7 +8,10 @@
 use App\Http\Controllers\Messaging\ConversationController;
 use App\Http\Controllers\Messaging\MessageController;
 use App\Http\Controllers\Messaging\OfferController;
+use App\Http\Controllers\Orders\ComplaintController;
 use App\Http\Controllers\Orders\OrderController;
+use App\Http\Controllers\Orders\OrderFulfilmentController;
+use App\Http\Controllers\Orders\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
@@ -26,4 +29,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders', [OrderController::class, 'store'])->middleware('throttle:20,1')->name('orders.store');
     Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
     Route::post('/orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
+    Route::post('/orders/{order}/ship', [OrderFulfilmentController::class, 'ship'])->name('orders.ship');
+    Route::post('/orders/{order}/deliver', [OrderFulfilmentController::class, 'deliver'])->name('orders.deliver');
+    Route::post('/orders/{order}/confirm-delivery', [OrderFulfilmentController::class, 'confirm'])->name('orders.confirm-delivery');
+    Route::post('/orders/{order}/reviews', [ReviewController::class, 'store'])->middleware('throttle:10,1')->name('orders.reviews.store');
+
+    Route::get('/complaints', [ComplaintController::class, 'index'])->name('complaints.index');
+    Route::get('/complaints/create', [ComplaintController::class, 'create'])->name('complaints.create');
+    Route::post('/complaints', [ComplaintController::class, 'store'])->middleware('throttle:10,1')->name('complaints.store');
+    Route::get('/complaints/{complaint}', [ComplaintController::class, 'show'])->name('complaints.show');
 });
+
+// Public: reviews a user has received.
+Route::get('/users/{user}/reviews', [ReviewController::class, 'index'])->name('users.reviews');
