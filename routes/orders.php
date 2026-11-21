@@ -8,6 +8,7 @@
 use App\Http\Controllers\Messaging\ConversationController;
 use App\Http\Controllers\Messaging\MessageController;
 use App\Http\Controllers\Messaging\OfferController;
+use App\Http\Controllers\Orders\BuyerDashboardController;
 use App\Http\Controllers\Orders\ComplaintController;
 use App\Http\Controllers\Orders\OrderController;
 use App\Http\Controllers\Orders\OrderFulfilmentController;
@@ -15,6 +16,8 @@ use App\Http\Controllers\Orders\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function () {
+    Route::get('/buyer/dashboard', BuyerDashboardController::class)->middleware('role:buyer')->name('buyer.dashboard');
+
     Route::get('/messages', [ConversationController::class, 'index'])->name('messages.index');
     Route::post('/messages', [ConversationController::class, 'store'])->middleware('throttle:30,1')->name('messages.store');
     Route::get('/messages/{conversation}', [ConversationController::class, 'show'])->name('messages.show');
