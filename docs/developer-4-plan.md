@@ -93,7 +93,7 @@ Rules: at most one `pending` offer per conversation (enforced in the service und
 | subtotal | decimal(12,2) | sum of items |
 | total_amount | decimal(12,2) | = subtotal for v1 (no fees/delivery charge) **[GUESS]** |
 | currency | char(3) | `GHS` |
-| delivery_address | string(255) | |
+| delivery_address | string(255), nullable | required before payment; set at "buy now" or on the payment page after an accepted offer |
 | delivery_notes | string(500), nullable | |
 | paid_at, shipped_at, delivered_at, completed_at, cancelled_at | timestamp, nullable | |
 | cancellation_reason | string(255), nullable | |
@@ -242,7 +242,7 @@ Raising a complaint on a `paid`/`shipped`/`delivered` order also moves it to `di
 ### 4.1 How to work before those exist, without competing implementations
 
 1. **Interface contracts, not copies.** Dev 4 proposes small interfaces that Dev 1/Dev 3 implement in their own modules:
-   - `App\Contracts\InventoryReservations` with `reserve(Listing $listing, string $quantity, Order $order): void`, `release(Order $order): void`, `commitSale(Order $order): void`. Dev 3's `InventoryService` implements it and binds it in a service provider.
+   - `App\Contracts\InventoryReservations` with `availableQuantity(Listing $listing): string`, `reserve(Order $order): void`, `release(Order $order): void`, `commitSale(Order $order): void` (see `app/Contracts/InventoryReservations.php`). Dev 3's `InventoryService` implements it and binds it in a service provider.
    - Dev 1's `User` exposes `hasRole(RoleName|string $role): bool`.
    These signatures go into the shared database/contract doc for sign-off. **[GUESS]**, needs Dev 3 and Dev 1 agreement.
 2. **Fakes only in tests.** `tests/Fakes/FakeInventoryReservations.php` is bound inside Dev 4 feature tests only. No production stub is committed.
@@ -442,6 +442,12 @@ Because Laravel is not initialized yet, D2–D3 work can be built and tested aga
 - PRs into `dev`, reviewed by at least one other developer. Migrations announced in the team chat before merge.
 
 ---
+
+## 11a. What Developer 4 expects from Developer 1's foundation
+- Inertia page path `resources/js/Pages` (capital P, as in the agreed structure) and Ziggy's `route()` helper in React.
+- `AuthenticatedLayout` accepting a `header` prop, and `auth.user` shared by `HandleInertiaRequests`.
+- `routes/web.php` requiring `routes/orders.php`, `routes/payments.php`; `bootstrap/app.php` loading `routes/api.php`; `role` middleware alias for `EnsureUserHasRole`.
+- A named `login` route (guests hitting Dev 4 pages are redirected there).
 
 ## 12. Decisions needed from the team
 1. Section 7.6: who receives MoMo money (platform collect + payout vs per-seller merchant accounts vs Hubtel).

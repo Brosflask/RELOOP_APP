@@ -18,7 +18,7 @@ return new class extends Migration
             $table->decimal('subtotal', 12, 2);
             $table->decimal('total_amount', 12, 2);
             $table->char('currency', 3)->default('GHS');
-            $table->string('delivery_address', 255);
+            $table->string('delivery_address', 255)->nullable(); // required before payment
             $table->string('delivery_notes', 500)->nullable();
             $table->timestamp('paid_at')->nullable();
             $table->timestamp('shipped_at')->nullable();
