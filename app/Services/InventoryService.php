@@ -206,6 +206,37 @@ class InventoryService implements InventoryReservations
         ];
     }
 
+    /** Available quantity of one lot, never below zero. */
+    public function availableQuantityForLot(MaterialLot $lot): string
+    {
+        return Money::quantity(max(0, $this->balancesMilli($lot)['available']) / 1000);
+    }
+
+    /**
+     * Available quantity for many lots in one query (lists and dashboards).
+     *
+     * @param  list<int>  $lotIds
+     * @return array<int, string> lot id => available, never below zero
+     */
+    public function availableForLots(array $lotIds): array
+    {
+        if ($lotIds === []) {
+            return [];
+        }
+        $rows = InventoryMovement::query()
+            ->whereIn('material_lot_id', $lotIds)
+            ->groupBy('material_lot_id')
+            ->selectRaw('material_lot_id, COALESCE(SUM(quantity_change), 0) - COALESCE(SUM(reserved_change), 0) AS available')
+            ->pluck('available', 'material_lot_id');
+
+        $result = [];
+        foreach ($lotIds as $id) {
+            $result[$id] = Money::quantity(max(0, Money::toMilli((string) ($rows[$id] ?? 0))) / 1000);
+        }
+
+        return $result;
+    }
+
     /** Ledger rows for one bucket, newest first. */
     public function history(MaterialLot|Listing $bucket)
     {
