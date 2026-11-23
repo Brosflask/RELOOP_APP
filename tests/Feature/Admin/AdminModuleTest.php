@@ -74,7 +74,8 @@ class AdminModuleTest extends TestCase
                 ->has('sales_by_day', 1)
                 ->where('sales_by_day.0.finished_product', '20.00')
                 ->where('top_sellers.0.id', $paid->seller_id)
-                ->where('impact.kg_collected', null));
+                // null until Developer 2's collection_records table exists, then a 3-dp total.
+                ->where('impact.kg_collected', \Illuminate\Support\Facades\Schema::hasTable('collection_records') ? '0.000' : null));
     }
 
     public function test_transactions_export_csv(): void
