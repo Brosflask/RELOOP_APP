@@ -48,7 +48,7 @@ class OrderFlowTest extends TestCase
     public function test_raw_material_order_snapshots_unit_and_lot(): void
     {
         $listing = $this->listing(['listing_type' => 'raw_material', 'price' => '3.20'], '500');
-        $lotId = DB::table('material_lots')->insertGetId(['code' => 'LOT-1', 'created_at' => now(), 'updated_at' => now()]);
+        $lotId = \App\Models\MaterialLot::factory()->create(['code' => 'LOT-1'])->id;
         DB::table('raw_material_listing_details')->insert([
             'listing_id' => $listing->id, 'material_lot_id' => $lotId, 'material_type' => 'PET',
             'available_quantity' => 500, 'unit' => 'kg', 'created_at' => now(), 'updated_at' => now(),
