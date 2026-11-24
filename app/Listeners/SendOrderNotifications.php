@@ -3,6 +3,7 @@
 namespace App\Listeners;
 
 use App\Enums\OrderStatus;
+use App\Events\ManualPaymentSubmitted;
 use App\Events\OfferMade;
 use App\Events\OrderStatusChanged;
 use App\Events\PaymentFailed;
@@ -37,6 +38,16 @@ class SendOrderNotifications
     {
         $order = $event->payment->order;
         $order->buyer->notify(new OrderUpdated($order, 'Payment not completed', 'Your MoMo payment did not go through. You can try again from the order page.'));
+    }
+
+    public function handleManualPaymentSubmitted(ManualPaymentSubmitted $event): void
+    {
+        $payment = $event->payment->loadMissing('order.seller');
+        $payment->order->seller->notify(new OrderUpdated(
+            $payment->order,
+            'Confirm a payment',
+            sprintf('The buyer says they paid GHS %s (reference %s). Check that you received it, then confirm or reject it on the order page.', $payment->amount, $payment->provider_reference),
+        ));
     }
 
     public function handleOfferMade(OfferMade $event): void

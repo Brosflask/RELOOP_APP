@@ -9,4 +9,7 @@ enum PaymentEventType: string
     case StatusCheck = 'status_check';
     case StatusChanged = 'status_changed';
     case Error = 'error';
+    case ManualSubmitted = 'manual_submitted';
+    case ManualConfirmed = 'manual_confirmed';
+    case ManualRejected = 'manual_rejected';
 }

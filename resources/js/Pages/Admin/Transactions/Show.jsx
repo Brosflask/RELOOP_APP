@@ -8,7 +8,7 @@ function Row({ k, v }) {
     return <div className="flex justify-between gap-4 py-1.5 text-sm"><dt className="text-gray-500">{k}</dt><dd className="break-all text-right text-gray-900">{v ?? '–'}</dd></div>;
 }
 
-export default function TransactionShow({ payment, can_recheck }) {
+export default function TransactionShow({ payment, can_recheck, can_settle }) {
     const ack = useForm({ note: '' });
 
     return (
@@ -25,12 +25,18 @@ export default function TransactionShow({ payment, can_recheck }) {
                             <Row k="Order" v={payment.order && <Link href={route('orders.show', payment.order.id)} className="text-green-700">{payment.order.code} ({payment.order.status})</Link>} />
                             <Row k="Payer" v={`${payment.payer?.name} · ${payment.payer_msisdn}`} />
                             <Row k="Payee" v={payment.payee?.name} />
+                            <Row k="Method" v={payment.provider === 'manual' ? 'Manual (confirmed by seller)' : 'MTN MoMo'} />
                             <Row k="Our reference" v={payment.transaction_reference} />
-                            <Row k="MTN reference" v={payment.provider_reference} />
+                            <Row k={payment.provider === 'manual' ? 'Buyer reference' : 'MTN reference'} v={payment.provider_reference} />
                             <Row k="Checks" v={`${payment.check_attempts} · last ${payment.last_checked_at ? new Date(payment.last_checked_at).toLocaleString() : 'never'}`} />
                             <Row k="Verified" v={payment.verified_at && new Date(payment.verified_at).toLocaleString()} />
                             <Row k="Failure" v={payment.failure_reason} />
                         </dl>
+                        {can_settle && (
+                            <Link href={route('payments.show', payment.id)} className="mt-4 block w-full rounded-md bg-green-700 px-4 py-2 text-center text-sm font-semibold text-white">
+                                Confirm or reject this manual payment
+                            </Link>
+                        )}
                         {can_recheck && (
                             <button onClick={() => router.post(route('admin.transactions.recheck', payment.id), {}, { preserveScroll: true })}
                                 className="mt-4 w-full rounded-md bg-yellow-400 px-4 py-2 text-sm font-semibold">Re-check with MTN</button>

@@ -114,6 +114,10 @@ class OrderController extends Controller
                 ]),
                 'payments' => $order->payments->sortByDesc('id')->values()->map(fn ($p) => [
                     'id' => $p->id,
+                    'provider' => $p->provider->value,
+                    'provider_label' => $p->provider->label(),
+                    'reference' => $p->provider->value === 'manual' ? $p->provider_reference : null,
+                    'can_settle' => $p->provider->value === 'manual' && $p->status->value === 'pending' && $user->can('settleManual', $p),
                     'status' => $p->status->value,
                     'amount' => (string) $p->amount,
                     'created_at' => $p->created_at->toIso8601String(),

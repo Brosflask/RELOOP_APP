@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentEventType;
 use App\Enums\PaymentProvider;
 use App\Enums\PaymentStatus;
+use App\Events\ManualPaymentSubmitted;
 use App\Events\PaymentFailed;
 use App\Events\PaymentSucceeded;
 use App\Exceptions\BusinessRuleException;
@@ -51,20 +52,7 @@ class PaymentService
     public function initiate(Order $order, User $buyer, string $msisdn, ?string $deliveryAddress = null): Payment
     {
         [$payment, $isNew] = DB::transaction(function () use ($order, $buyer, $msisdn, $deliveryAddress) {
-            $order = Order::query()->lockForUpdate()->findOrFail($order->id);
-
-            if ($order->buyer_id !== $buyer->id) {
-                throw new BusinessRuleException('Only the buyer can pay for this order.', 'order');
-            }
-            if ($order->status !== OrderStatus::AwaitingPayment) {
-                throw new BusinessRuleException('This order is not waiting for payment.', 'order');
-            }
-            if ($deliveryAddress) {
-                $order->update(['delivery_address' => $deliveryAddress]);
-            }
-            if (! $order->delivery_address) {
-                throw new BusinessRuleException('Add a delivery address before paying.', 'delivery_address');
-            }
+            $order = $this->lockPayableOrder($order, $buyer, $deliveryAddress);
 
             $pending = $order->payments()->where('status', PaymentStatus::Pending)->latest('id')->first();
             if ($pending) {
@@ -97,6 +85,115 @@ class PaymentService
         return $payment->refresh();
     }
 
+    /**
+     * Manual payment: the buyer has paid the seller outside the platform and
+     * gives the transaction ID. The payment stays pending until the seller
+     * or an admin confirms receipt. Nothing is marked paid automatically.
+     */
+    public function initiateManual(Order $order, User $buyer, string $msisdn, string $reference, ?string $deliveryAddress = null): Payment
+    {
+        return DB::transaction(function () use ($order, $buyer, $msisdn, $reference, $deliveryAddress) {
+            $order = $this->lockPayableOrder($order, $buyer, $deliveryAddress);
+
+            if ($pending = $order->payments()->where('status', PaymentStatus::Pending)->latest('id')->first()) {
+                throw new BusinessRuleException('A payment for this order is already waiting for the seller to confirm.', 'payment');
+            }
+
+            $payment = Payment::create([
+                'order_id' => $order->id,
+                'payer_id' => $order->buyer_id,
+                'payee_id' => $order->seller_id,
+                'provider' => PaymentProvider::Manual,
+                'transaction_reference' => (string) Str::uuid(),
+                'amount' => $order->total_amount,
+                'currency' => $order->currency,
+                'payer_msisdn' => $msisdn,
+                'external_id' => $order->code,
+            ]);
+            $payment->forceFill(['provider_reference' => Str::limit(trim($reference), 100, '')])->save();
+
+            $this->log($payment, PaymentEventType::ManualSubmitted, null, ['reference' => $payment->provider_reference, 'by' => $buyer->id]);
+            ManualPaymentSubmitted::dispatch($payment);
+
+            return $payment;
+        });
+    }
+
+    /** The seller (or an admin) confirms the money arrived. This is the human verification step. */
+    public function confirmManual(Payment $payment, User $confirmer): Payment
+    {
+        return DB::transaction(function () use ($payment, $confirmer) {
+            $payment = $this->lockPendingManual($payment);
+            $order = Order::query()->lockForUpdate()->findOrFail($payment->order_id);
+
+            if ($order->status !== OrderStatus::AwaitingPayment) {
+                throw new BusinessRuleException('This order is no longer waiting for payment.', 'payment');
+            }
+
+            $payment->forceFill([
+                'status' => PaymentStatus::Successful,
+                'verified_at' => now(),
+                'successful_order_id' => $order->id,
+                'failure_reason' => null,
+            ])->save();
+            $this->log($payment, PaymentEventType::ManualConfirmed, null, ['by' => $confirmer->id]);
+
+            $this->orders->transition($order, OrderStatus::Paid, $confirmer, 'Manual payment confirmed by '.$confirmer->name.' (ref '.$payment->provider_reference.')');
+            $this->inventory->commitSale($order->load('items'));
+
+            PaymentSucceeded::dispatch($payment);
+
+            return $payment;
+        });
+    }
+
+    /** The seller says the money did not arrive. The buyer can submit again. */
+    public function rejectManual(Payment $payment, User $by, string $reason): Payment
+    {
+        return DB::transaction(function () use ($payment, $by, $reason) {
+            $payment = $this->lockPendingManual($payment);
+            $this->log($payment, PaymentEventType::ManualRejected, null, ['by' => $by->id, 'reason' => $reason]);
+            $this->markFailed($payment, 'Seller did not receive this payment: '.$reason);
+
+            return $payment;
+        });
+    }
+
+    private function lockPendingManual(Payment $payment): Payment
+    {
+        $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+
+        if ($payment->provider !== PaymentProvider::Manual) {
+            throw new BusinessRuleException('Only manual payments can be confirmed by hand.', 'payment');
+        }
+        if ($payment->status !== PaymentStatus::Pending) {
+            throw new BusinessRuleException('This payment has already been settled.', 'payment');
+        }
+
+        return $payment;
+    }
+
+    /** Shared checks before any payment: buyer only, order unpaid, delivery address present. */
+    private function lockPayableOrder(Order $order, User $buyer, ?string $deliveryAddress): Order
+    {
+        $order = Order::query()->lockForUpdate()->findOrFail($order->id);
+
+        if ($order->buyer_id !== $buyer->id) {
+            throw new BusinessRuleException('Only the buyer can pay for this order.', 'order');
+        }
+        if ($order->status !== OrderStatus::AwaitingPayment) {
+            throw new BusinessRuleException('This order is not waiting for payment.', 'order');
+        }
+        if ($deliveryAddress) {
+            $order->update(['delivery_address' => $deliveryAddress]);
+        }
+        if (! $order->delivery_address) {
+            throw new BusinessRuleException('Add a delivery address before paying.', 'delivery_address');
+        }
+
+        return $order;
+    }
+
     /** Send the RequestToPay. Called once per payment, after the row is committed. */
     private function submit(Payment $payment): void
     {
@@ -126,7 +223,7 @@ class PaymentService
     /** Ask MTN for the current status and apply it. */
     public function verify(Payment $payment): Payment
     {
-        if ($payment->status->isFinal()) {
+        if ($payment->status->isFinal() || $payment->provider !== PaymentProvider::MtnMomo) {
             return $payment;
         }
 
