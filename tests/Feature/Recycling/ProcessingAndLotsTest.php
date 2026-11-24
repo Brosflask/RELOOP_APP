@@ -4,12 +4,12 @@ namespace Tests\Feature\Recycling;
 
 use App\Events\MaterialLotsCreated;
 use App\Models\InventoryMovement;
+use App\Models\MaterialBatch;
 use App\Models\MaterialLot;
 use App\Models\ProcessingRecord;
 use App\Models\User;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -27,18 +27,10 @@ class ProcessingAndLotsTest extends TestCase
         $this->recycler = User::factory()->create()->assignRole('recycler');
     }
 
-    /** A batch this recycler received (Developer 2's tables; columns per ReceivedBatches). */
+    /** A batch this recycler received, using Developer 2's factory (writes the batch_receipts row). */
     private function receivedBatch(string $kg = '600', ?User $recycler = null): int
     {
-        $batchId = DB::table('material_batches')->insertGetId(['created_at' => now(), 'updated_at' => now()]);
-        DB::table('batch_receipts')->insert([
-            'material_batch_id' => $batchId,
-            'recycler_id' => ($recycler ?? $this->recycler)->id,
-            'received_weight_kg' => $kg,
-            'created_at' => now(), 'updated_at' => now(),
-        ]);
-
-        return $batchId;
+        return MaterialBatch::factory()->receivedBy($recycler ?? $this->recycler, $kg)->create()->id;
     }
 
     private function payload(int $batchId, array $overrides = []): array
