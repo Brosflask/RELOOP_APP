@@ -4,6 +4,7 @@
 
 use App\Http\Controllers\Traceability\BatchController;
 use App\Http\Controllers\Traceability\RecyclerBatchController;
+use App\Http\Controllers\Traceability\TraceabilityController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'role:collector'])->prefix('collector/batches')->name('collector.batches.')->group(function () {
@@ -26,3 +27,7 @@ Route::middleware(['auth', 'role:recycler'])->prefix('recycler/batches')->name('
 
 // Shared batch page: the collector, the recycler it was sent to, or an admin (MaterialBatchPolicy).
 Route::middleware('auth')->get('/batches/{batch}', [BatchController::class, 'show'])->name('batches.show');
+
+// Traceability. The listing page is public like the marketplace; it never shows household names or addresses.
+Route::get('/trace/listings/{listing}', [TraceabilityController::class, 'listing'])->name('trace.listing');
+Route::middleware('auth')->get('/trace/lots/{lot}', [TraceabilityController::class, 'lot'])->name('trace.lot');
