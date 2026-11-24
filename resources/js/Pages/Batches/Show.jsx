@@ -12,6 +12,7 @@ import RecordPicker from '@/Components/Traceability/RecordPicker';
 import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
+import TextInput from '@/Components/TextInput';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -55,6 +56,17 @@ export default function BatchShow({ batch: b, records, merged_batches, receipt, 
                     </Card>
                 </div>
 
+                {can.receive && <ReceiveForm batch={b} />}
+                {can.reopen && (
+                    <Card title="This batch was rejected">
+                        <p className="mb-3 text-sm text-gray-600">Open it again to add or remove records, then send it to the same or another recycler.</p>
+                        <PrimaryButton onClick={() => router.post(route('collector.batches.reopen', b.id))}>Open batch again</PrimaryButton>
+                    </Card>
+                )}
+                {can.process && route().has('recycler.processing.create') && (
+                    <Link href={route('recycler.processing.create', { batch: b.id })}
+                        className="inline-block rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800">Record processing for this batch</Link>
+                )}
                 {can.dispatch && <DispatchForm batch={b} recyclers={recyclers} />}
 
                 {merged_batches.length > 0 && (
@@ -135,6 +147,54 @@ function AddRecords({ batch, records }) {
                     Add to batch
                 </PrimaryButton>
             </div>
+        </Card>
+    );
+}
+
+function ReceiveForm({ batch }) {
+    const [rejecting, setRejecting] = useState(false);
+    const receive = useForm({ received_weight_kg: batch.total_weight_kg, condition_notes: '' });
+    const reject = useForm({ reason: '' });
+    const diff = (Number(receive.data.received_weight_kg) || 0) - Number(batch.total_weight_kg);
+
+    if (rejecting) {
+        return (
+            <Card title="Reject this batch">
+                <form onSubmit={(e) => { e.preventDefault(); reject.post(route('recycler.batches.reject', batch.id)); }} className="space-y-3">
+                    <FormField id="reason" label="Why are you rejecting it?" error={reject.errors.reason}>
+                        <TextArea id="reason" rows={3} value={reject.data.reason} onChange={(e) => reject.setData('reason', e.target.value)}
+                            placeholder="For example: mixed with other plastics, too wet" required />
+                    </FormField>
+                    <div className="flex justify-end gap-2">
+                        <SecondaryButton type="button" onClick={() => setRejecting(false)}>Back</SecondaryButton>
+                        <PrimaryButton disabled={reject.processing} className="bg-red-600 hover:bg-red-700">Reject batch</PrimaryButton>
+                    </div>
+                </form>
+            </Card>
+        );
+    }
+
+    return (
+        <Card title="Confirm you received this batch">
+            <form onSubmit={(e) => { e.preventDefault(); receive.post(route('recycler.batches.receive', batch.id)); }} className="grid gap-4 sm:grid-cols-2">
+                <FormField id="received_weight_kg" label="Weight you measured (kg)" error={receive.errors.received_weight_kg}
+                    hint={`The collector sent ${batch.total_weight_kg} kg.`}>
+                    <TextInput id="received_weight_kg" type="number" step="0.001" min="0" inputMode="decimal" className="block w-full"
+                        value={receive.data.received_weight_kg} onChange={(e) => receive.setData('received_weight_kg', e.target.value)} required />
+                </FormField>
+                <FormField id="condition_notes" label="Condition notes (optional)" error={receive.errors.condition_notes}>
+                    <TextArea id="condition_notes" rows={2} value={receive.data.condition_notes} onChange={(e) => receive.setData('condition_notes', e.target.value)} />
+                </FormField>
+                <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
+                    <p className={`text-sm ${diff < 0 ? 'text-amber-700' : 'text-gray-500'}`}>
+                        {diff === 0 ? 'Same as sent.' : <>Difference: <Quantity value={diff} /></>}
+                    </p>
+                    <div className="flex gap-2">
+                        <SecondaryButton type="button" onClick={() => setRejecting(true)}>Reject</SecondaryButton>
+                        <PrimaryButton disabled={receive.processing}>Confirm receipt</PrimaryButton>
+                    </div>
+                </div>
+            </form>
         </Card>
     );
 }

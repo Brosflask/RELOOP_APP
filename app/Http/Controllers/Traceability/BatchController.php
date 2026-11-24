@@ -99,6 +99,9 @@ class BatchController extends Controller
             'can' => [
                 'manage' => $canManage,
                 'dispatch' => $canManage && (float) $batch->total_weight_kg > 0,
+                'receive' => $user->can('receive', $batch) && $batch->status === BatchStatus::Dispatched,
+                'reopen' => $user->can('manage', $batch) && $batch->status === BatchStatus::Rejected,
+                'process' => $user->can('receive', $batch) && $batch->status === BatchStatus::Received,
             ],
         ]);
     }
@@ -132,6 +135,14 @@ class BatchController extends Controller
         $this->batches->dispatch($batch, $request->user(), $recycler, $request->validated('notes'));
 
         return to_route('batches.show', $batch)->with('success', 'Batch sent to '.$recycler->name.'.');
+    }
+
+    public function reopen(Request $request, MaterialBatch $batch): RedirectResponse
+    {
+        Gate::authorize('manage', $batch);
+        $this->batches->reopen($batch, $request->user());
+
+        return to_route('batches.show', $batch)->with('success', 'Batch opened again. Fix it and send it again.');
     }
 
     // ---------------------------------------------------------------------

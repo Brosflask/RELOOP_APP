@@ -6,8 +6,10 @@ use App\Enums\BatchStatus;
 use App\Enums\CollectionRecordStatus;
 use App\Enums\MaterialType;
 use App\Enums\RoleName;
+use App\Events\BatchReceived;
 use App\Exceptions\BusinessRuleException;
 use App\Models\BatchCollection;
+use App\Models\BatchReceipt;
 use App\Models\CollectionRecord;
 use App\Models\MaterialBatch;
 use App\Models\User;
@@ -127,6 +129,75 @@ class BatchService
         });
     }
 
+    /**
+     * The recycler weighs the batch on arrival and confirms it. This writes the
+     * batch_receipts row Developer 3's processing reads (ReceivedBatches).
+     */
+    public function receive(MaterialBatch $batch, User $recycler, string $receivedWeightKg, ?string $conditionNotes = null): BatchReceipt
+    {
+        return DB::transaction(function () use ($batch, $recycler, $receivedWeightKg, $conditionNotes) {
+            $batch = $this->lockSentTo($batch, $recycler);
+            $received = Money::toMilli($receivedWeightKg);
+            if ($received <= 0) {
+                throw new BusinessRuleException('Enter the weight you measured.', 'received_weight_kg');
+            }
+            $expected = Money::toMilli((string) $batch->total_weight_kg);
+
+            $receipt = BatchReceipt::create([
+                'material_batch_id' => $batch->id,
+                'recycler_id' => $recycler->id,
+                'expected_weight_kg' => Money::quantity($expected / 1000),
+                'received_weight_kg' => Money::quantity($received / 1000),
+                'weight_difference_kg' => Money::quantity(($received - $expected) / 1000),
+                'received_at' => now(),
+                'condition_notes' => $conditionNotes,
+            ]);
+            $batch->update(['status' => BatchStatus::Received, 'received_at' => now()]);
+
+            $batch->collector?->notify(new BatchUpdated($batch, 'Batch received',
+                $recycler->name.' received '.$batch->code.' and weighed '.$receipt->received_weight_kg.' kg.'));
+            BatchReceived::dispatch($batch, $receipt);
+
+            return $receipt;
+        });
+    }
+
+    /** The recycler refuses the batch (wrong plastic, too dirty...). The collector can take it back. */
+    public function reject(MaterialBatch $batch, User $recycler, string $reason): MaterialBatch
+    {
+        return DB::transaction(function () use ($batch, $recycler, $reason) {
+            $batch = $this->lockSentTo($batch, $recycler);
+            $batch->update(['status' => BatchStatus::Rejected, 'rejected_at' => now(), 'rejection_reason' => $reason]);
+            $batch->collector?->notify(new BatchUpdated($batch, 'Batch rejected', $recycler->name.' rejected '.$batch->code.': '.$reason));
+
+            return $batch;
+        });
+    }
+
+    /** After a rejection the collector opens the batch again, to fix it or send it elsewhere. */
+    public function reopen(MaterialBatch $batch, User $collector): MaterialBatch
+    {
+        return DB::transaction(function () use ($batch, $collector) {
+            $batch = MaterialBatch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
+            if ($batch->collector_id !== $collector->id) {
+                throw new BusinessRuleException('This batch is not yours.');
+            }
+            if ($batch->status !== BatchStatus::Rejected) {
+                throw new BusinessRuleException('Only a rejected batch can be opened again.');
+            }
+            $batch->update([
+                'status' => BatchStatus::Open,
+                'recycler_id' => null,
+                'dispatched_at' => null,
+                'notes' => trim(($batch->notes ? $batch->notes."\n" : '').'Rejected '.$batch->rejected_at?->toDateString().': '.$batch->rejection_reason),
+                'rejected_at' => null,
+                'rejection_reason' => null,
+            ]);
+
+            return $batch;
+        });
+    }
+
     // ---------------------------------------------------------------------
 
     /** @param  list<int>  $recordIds */
@@ -170,6 +241,19 @@ class BatchService
         $children = MaterialBatch::where('consolidated_into_id', $batch->id)->pluck('total_weight_kg');
         $milli = $own->concat($children)->sum(fn ($w) => Money::toMilli((string) $w));
         $batch->update(['total_weight_kg' => Money::quantity($milli / 1000)]);
+    }
+
+    private function lockSentTo(MaterialBatch $batch, User $recycler): MaterialBatch
+    {
+        $batch = MaterialBatch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
+        if ($batch->recycler_id !== $recycler->id) {
+            throw new BusinessRuleException('This batch was not sent to you.');
+        }
+        if ($batch->status !== BatchStatus::Dispatched) {
+            throw new BusinessRuleException('This batch is '.strtolower($batch->status->label()).', so it can’t be received or rejected now.');
+        }
+
+        return $batch;
     }
 
     private function lockOpen(MaterialBatch $batch, User $collector): MaterialBatch

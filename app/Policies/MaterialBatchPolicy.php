@@ -27,4 +27,10 @@ class MaterialBatchPolicy
     {
         return $batch->collector_id === $user->id && $user->hasRole(RoleName::Collector);
     }
+
+    /** receive or reject: only the recycler it was sent to */
+    public function receive(User $user, MaterialBatch $batch): bool
+    {
+        return $batch->recycler_id !== null && $batch->recycler_id === $user->id && $user->hasRole(RoleName::Recycler);
+    }
 }
