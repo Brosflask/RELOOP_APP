@@ -29,6 +29,8 @@ class InitiatePaymentRequest extends FormRequest
             // The MTN sandbox uses its own test numbers, so only enforce the Ghana format outside it.
             'msisdn' => ['required', 'string', $this->isSandbox() ? 'regex:/^\d{8,15}$/' : 'regex:/^233[0-9]{9}$/'],
             'delivery_address' => [$this->route('order')->delivery_address ? 'nullable' : 'required', 'string', 'max:255'],
+            // Manual payments: the transaction ID from the buyer's MoMo SMS or receipt.
+            'reference' => [$this->isManual() ? 'required' : 'prohibited', 'nullable', 'string', 'min:4', 'max:100'],
         ];
     }
 
@@ -39,6 +41,12 @@ class InitiatePaymentRequest extends FormRequest
 
     private function isSandbox(): bool
     {
-        return config('mtn_momo.environment') === 'sandbox';
+        // Manual payments are real-world payments, so always use the Ghana number format.
+        return ! $this->isManual() && config('mtn_momo.environment') === 'sandbox';
+    }
+
+    private function isManual(): bool
+    {
+        return config('payments.driver') === 'manual';
     }
 }

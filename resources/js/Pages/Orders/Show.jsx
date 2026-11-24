@@ -51,6 +51,13 @@ export default function OrdersShow({ order, viewer_role, can }) {
                         {order.delivery_notes && <p className="text-sm text-gray-600">{order.delivery_notes}</p>}
                     </section>
 
+                    {order.payments.filter((p) => p.can_settle).map((p) => (
+                        <div key={p.id} className="rounded-lg bg-sky-50 p-4 text-sm text-sky-900">
+                            The buyer says they paid <Money amount={p.amount} currency={order.currency} /> (reference {p.reference}).{' '}
+                            <Link href={route('payments.show', p.id)} className="font-semibold underline">Confirm or reject it</Link>
+                        </div>
+                    ))}
+
                     {Object.values(errors ?? {}).length > 0 && (
                         <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{Object.values(errors).join(' ')}</div>
                     )}

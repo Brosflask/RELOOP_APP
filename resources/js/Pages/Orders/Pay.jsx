@@ -3,8 +3,9 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Money from '@/Components/Orders/Money';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-export default function Pay({ order, pending_payment_id, sandbox }) {
-    const form = useForm({ msisdn: '', delivery_address: order.delivery_address ?? '' });
+export default function Pay({ order, pending_payment_id, sandbox, driver, manual_instructions, conversation_id }) {
+    const manual = driver === 'manual';
+    const form = useForm({ msisdn: '', delivery_address: order.delivery_address ?? '', ...(manual ? { reference: '' } : {}) });
 
     const submit = (e) => {
         e.preventDefault();
@@ -19,6 +20,16 @@ export default function Pay({ order, pending_payment_id, sandbox }) {
                     <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
                         Test mode: this uses the MTN MoMo sandbox. No real money moves.
                     </p>
+                )}
+
+                {manual && (
+                    <div className="space-y-1 rounded-md bg-sky-50 p-3 text-sm text-sky-900">
+                        <p className="font-semibold">How to pay</p>
+                        <p>{manual_instructions}</p>
+                        {conversation_id && (
+                            <Link href={route('messages.show', conversation_id)} className="font-semibold underline">Open your conversation with the seller</Link>
+                        )}
+                    </div>
                 )}
 
                 {pending_payment_id && (
@@ -44,12 +55,21 @@ export default function Pay({ order, pending_payment_id, sandbox }) {
 
                 <form onSubmit={submit} className="space-y-4 rounded-lg bg-white p-5 shadow-sm">
                     <label className="block text-sm">
-                        <span className="font-medium text-gray-700">MTN Mobile Money number</span>
+                        <span className="font-medium text-gray-700">{manual ? 'Number you paid from' : 'MTN Mobile Money number'}</span>
                         <input type="tel" inputMode="tel" autoComplete="tel" placeholder="024 123 4567" value={form.data.msisdn}
                             onChange={(e) => form.setData('msisdn', e.target.value)}
                             className="mt-1 w-full rounded-md border-gray-300 shadow-sm" required />
                         {form.errors.msisdn && <p className="mt-1 text-xs text-red-600">{form.errors.msisdn}</p>}
                     </label>
+                    {manual && (
+                        <label className="block text-sm">
+                            <span className="font-medium text-gray-700">Transaction ID</span>
+                            <input type="text" maxLength={100} placeholder="From your MoMo confirmation SMS" value={form.data.reference}
+                                onChange={(e) => form.setData('reference', e.target.value)}
+                                className="mt-1 w-full rounded-md border-gray-300 shadow-sm" required />
+                            {form.errors.reference && <p className="mt-1 text-xs text-red-600">{form.errors.reference}</p>}
+                        </label>
+                    )}
                     <label className="block text-sm">
                         <span className="font-medium text-gray-700">Delivery address</span>
                         <input type="text" maxLength={255} value={form.data.delivery_address}
@@ -61,11 +81,13 @@ export default function Pay({ order, pending_payment_id, sandbox }) {
                         <p className="text-sm text-red-600">{form.errors.order ?? form.errors.payment}</p>
                     )}
                     <p className="text-xs text-gray-500">
-                        You'll get a prompt on your phone. Approve it with your MoMo PIN to complete the payment.
+                        {manual
+                            ? 'Your order is marked paid only after the seller confirms they received the money.'
+                            : "You'll get a prompt on your phone. Approve it with your MoMo PIN to complete the payment."}
                     </p>
                     <button type="submit" disabled={form.processing}
                         className="w-full rounded-md bg-yellow-400 px-4 py-2.5 text-sm font-semibold text-gray-900 hover:bg-yellow-500 disabled:opacity-50">
-                        {form.processing ? 'Sending request…' : 'Pay with MTN MoMo'}
+                        {form.processing ? 'Sending…' : manual ? 'I have paid the seller' : 'Pay with MTN MoMo'}
                     </button>
                 </form>
             </div>

@@ -35,7 +35,7 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($from, $to) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['payment_id', 'created_at', 'verified_at', 'order_code', 'payer', 'payee', 'amount', 'currency', 'status', 'transaction_reference', 'provider_reference', 'requires_attention', 'failure_reason']);
+            fputcsv($out, ['payment_id', 'created_at', 'verified_at', 'order_code', 'payer', 'payee', 'provider', 'amount', 'currency', 'status', 'transaction_reference', 'provider_reference', 'requires_attention', 'failure_reason']);
 
             Payment::query()
                 ->with(['order:id,code', 'payer:id,name', 'payee:id,name'])
@@ -45,7 +45,7 @@ class ReportController extends Controller
                     foreach ($payments as $p) {
                         fputcsv($out, [
                             $p->id, $p->created_at?->toIso8601String(), $p->verified_at?->toIso8601String(),
-                            $p->order?->code, $p->payer?->name, $p->payee?->name, (string) $p->amount, $p->currency,
+                            $p->order?->code, $p->payer?->name, $p->payee?->name, $p->provider->value, (string) $p->amount, $p->currency,
                             $p->status->value, $p->transaction_reference, $p->provider_reference,
                             $p->requires_attention ? 'yes' : 'no', $p->failure_reason,
                         ]);

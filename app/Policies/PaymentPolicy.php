@@ -15,6 +15,12 @@ class PaymentPolicy
             || $user->hasRole(RoleName::Admin);
     }
 
+    /** Confirm or reject a manual payment: the seller who should have received it, or an admin. */
+    public function settleManual(User $user, Payment $payment): bool
+    {
+        return $user->id === $payment->payee_id || $user->hasRole(RoleName::Admin);
+    }
+
     /** Manual "re-check with MTN" from the admin transactions page. */
     public function recheck(User $user, Payment $payment): bool
     {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Payments;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentProvider;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Payments\InitiatePaymentRequest;
@@ -44,18 +45,29 @@ class PaymentController extends Controller
                 'items' => $order->items->map->only('id', 'title', 'quantity', 'unit', 'line_total'),
             ],
             'pending_payment_id' => $pending?->id,
-            'sandbox' => config('mtn_momo.environment') === 'sandbox',
+            'driver' => config('payments.driver'),
+            'manual_instructions' => config('payments.manual.instructions'),
+            'conversation_id' => $order->conversation_id,
+            'sandbox' => config('payments.driver') === 'mtn_momo' && config('mtn_momo.environment') === 'sandbox',
         ]);
     }
 
     public function store(InitiatePaymentRequest $request, Order $order): RedirectResponse
     {
-        $payment = $this->payments->initiate(
-            $order,
-            $request->user(),
-            $request->string('msisdn'),
-            $request->input('delivery_address'),
-        );
+        $payment = config('payments.driver') === 'manual'
+            ? $this->payments->initiateManual(
+                $order,
+                $request->user(),
+                $request->string('msisdn'),
+                $request->string('reference'),
+                $request->input('delivery_address'),
+            )
+            : $this->payments->initiate(
+                $order,
+                $request->user(),
+                $request->string('msisdn'),
+                $request->input('delivery_address'),
+            );
 
         return to_route('payments.show', $payment);
     }
@@ -66,6 +78,9 @@ class PaymentController extends Controller
 
         return Inertia::render('Payments/Show', [
             'payment' => $this->present($payment->load('order:id,code,status')),
+            'can_settle' => $payment->provider === PaymentProvider::Manual
+                && $payment->status === PaymentStatus::Pending
+                && $request->user()->can('settleManual', $payment),
         ]);
     }
 
@@ -78,6 +93,7 @@ class PaymentController extends Controller
         Gate::authorize('view', $payment);
 
         if ($payment->status === PaymentStatus::Pending
+            && $payment->provider === PaymentProvider::MtnMomo
             && ! $payment->requires_attention
             && $payment->created_at->lte(now()->subSeconds(5))
             && ($payment->last_checked_at === null || $payment->last_checked_at->lte(now()->subSeconds(15)))) {
@@ -88,10 +104,34 @@ class PaymentController extends Controller
         return response()->json($this->present($payment->load('order:id,code,status')));
     }
 
+    /** Seller (or admin) confirms a manual payment arrived. */
+    public function confirm(Request $request, Payment $payment): RedirectResponse
+    {
+        Gate::authorize('settleManual', $payment);
+
+        $this->payments->confirmManual($payment, $request->user());
+
+        return back()->with('success', 'Payment confirmed. The order is now paid.');
+    }
+
+    /** Seller (or admin) says a manual payment did not arrive. */
+    public function reject(Request $request, Payment $payment): RedirectResponse
+    {
+        Gate::authorize('settleManual', $payment);
+        $data = $request->validate(['reason' => ['required', 'string', 'max:200']]);
+
+        $this->payments->rejectManual($payment, $request->user(), $data['reason']);
+
+        return back()->with('success', 'Payment rejected. The buyer has been told.');
+    }
+
     private function present(Payment $payment): array
     {
         return [
             'id' => $payment->id,
+            'provider' => $payment->provider->value,
+            'provider_label' => $payment->provider->label(),
+            'provider_reference' => $payment->provider === PaymentProvider::Manual ? $payment->provider_reference : null,
             'status' => $payment->status->value,
             'amount' => (string) $payment->amount,
             'currency' => $payment->currency,

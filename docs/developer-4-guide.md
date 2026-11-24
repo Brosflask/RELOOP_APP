@@ -51,7 +51,16 @@ Order lifecycle: `awaiting_payment → paid → shipped → delivered → comple
 
 ---
 
-## 3. MTN MoMo setup
+## 3. Payment method switch
+
+`PAYMENTS_DRIVER` in `.env` picks how buyers pay (`config/payments.php`):
+
+- `manual` (use this until MTN MoMo is connected): the buyer pays the seller outside the platform (MoMo transfer, cash) and enters the number they paid from and the transaction ID. The payment stays **pending** until the **seller or an admin confirms** they received the money on the payment page; only then is the order marked paid and the stock sold. The seller can also reject it ("not received"), and the buyer can submit again. Manual payments are never sent to MTN and are labelled "Manual (confirmed by seller)" everywhere, including the admin transactions page and CSV. Optional: `PAYMENTS_MANUAL_INSTRUCTIONS` changes the text shown on the pay page.
+- `mtn_momo` (default): the MTN MoMo flow below.
+
+Switching later is just changing `PAYMENTS_DRIVER` to `mtn_momo` and adding the MTN keys. Old manual payments keep their history.
+
+## 3a. MTN MoMo setup
 
 ### 3.1 Sandbox (development and demo)
 1. Sign up at the MTN MoMo developer portal, subscribe to the **Collections** product and copy the primary subscription key.

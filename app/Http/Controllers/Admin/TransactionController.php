@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\PaymentProvider;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
@@ -51,6 +52,7 @@ class TransactionController extends Controller
                 'amount' => (string) $p->amount,
                 'currency' => $p->currency,
                 'status' => $p->status->value,
+                'provider' => $p->provider->value,
                 'requires_attention' => $p->requires_attention,
             ]);
 
@@ -98,7 +100,8 @@ class TransactionController extends Controller
                     'created_at' => $e->created_at->toIso8601String(),
                 ]),
             ],
-            'can_recheck' => $payment->status === PaymentStatus::Pending,
+            'can_recheck' => $payment->status === PaymentStatus::Pending && $payment->provider === PaymentProvider::MtnMomo,
+            'can_settle' => $payment->status === PaymentStatus::Pending && $payment->provider === PaymentProvider::Manual,
         ]);
     }
 

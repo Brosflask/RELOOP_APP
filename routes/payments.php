@@ -12,5 +12,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}/pay', [PaymentController::class, 'create'])->name('payments.create');
     Route::post('/orders/{order}/payments', [PaymentController::class, 'store'])->middleware('throttle:10,1')->name('payments.store');
     Route::get('/payments/{payment}', [PaymentController::class, 'show'])->name('payments.show');
+    Route::post('/payments/{payment}/confirm', [PaymentController::class, 'confirm'])->name('payments.confirm');
+    Route::post('/payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
     Route::get('/payments/{payment}/status', [PaymentController::class, 'status'])->middleware('throttle:60,1')->name('payments.status');
 });

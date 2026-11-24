@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\PaymentProvider;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -23,6 +24,7 @@ class ReconcilePendingPayments implements ShouldBeUnique, ShouldQueue
     {
         Payment::query()
             ->where('status', PaymentStatus::Pending)
+            ->where('provider', PaymentProvider::MtnMomo)
             ->where('requires_attention', false)
             ->where('created_at', '<=', now()->subMinute())
             ->orderBy('id')
