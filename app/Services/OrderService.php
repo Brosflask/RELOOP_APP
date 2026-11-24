@@ -78,7 +78,8 @@ class OrderService
         $now = now();
 
         $order = Order::create([
-            'code' => 'TMP-'.Str::uuid(),
+            // Placeholder until the id is known. ULID keeps it within orders.code's 30 chars (MySQL enforces this).
+            'code' => 'TMP-'.Str::ulid(),
             'buyer_id' => $buyer->id,
             'seller_id' => $terms->sellerId,
             'conversation_id' => $conversation?->id,
