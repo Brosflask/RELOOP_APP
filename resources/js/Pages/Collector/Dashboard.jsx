@@ -17,6 +17,7 @@ export default function CollectorDashboard({ available, mine, areas, filters, st
     const actions = (
         <>
             <Link href={route('collector.records.index')} className="text-sm font-medium text-green-700 hover:underline">My records</Link>
+            <Link href={route('collector.batches.index')} className="text-sm font-medium text-green-700 hover:underline">My batches</Link>
             <Link href={route('collector.records.create')} className="rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800">Record a drop-off</Link>
         </>
     );
@@ -27,7 +28,9 @@ export default function CollectorDashboard({ available, mine, areas, filters, st
             <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
                 <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <Stat label="Collected this month"><Quantity value={stats.kg_this_month} /></Stat>
-                    <Stat label="Ready to batch"><Quantity value={stats.unbatched_kg} /></Stat>
+                    <Stat label="Ready to batch">
+                        <Link href={route('collector.batches.index')} className="hover:underline"><Quantity value={stats.unbatched_kg} /></Link>
+                    </Stat>
                     <Stat label="Waiting for households">{stats.awaiting_confirmation}</Stat>
                     <Stat label="Disputed" warn={stats.disputed > 0}>{stats.disputed}</Stat>
                 </dl>
